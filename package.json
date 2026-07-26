@@ -1,0 +1,59 @@
+{
+  "name": "nypl8",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.19.0 <23"
+  },
+  "scripts": {
+    "setup": "node scripts/setup.mjs",
+    "dev": "node scripts/dev-local.mjs",
+    "dev:lan": "node scripts/dev-local.mjs --host 0.0.0.0",
+    "build": "next build",
+    "start": "node scripts/run.mjs",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:unit && npm run test:backend",
+    "test:unit": "node --experimental-strip-types --test tests/plate-store.test.mts tests/rendered-html.test.mjs",
+    "test:backend": "node --test tests/backend-http.test.mjs",
+    "test:browser": "playwright test",
+    "check": "npm run lint && npm run typecheck && npm run build && npm test",
+    "assets:optimize": "node scripts/optimize-assets.mjs"
+  },
+  "dependencies": {
+    "next": "16.2.11",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1",
+    "@types/node": "22.19.19",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.2.11",
+    "sharp": "0.35.3",
+    "typescript": "6.0.3"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": {
+        "brace-expansion": "5.0.8"
+      }
+    },
+    "eslint": {
+      "minimatch": {
+        "brace-expansion": "1.1.16"
+      }
+    },
+    "next": {
+      "postcss": "8.5.23"
+    }
+  },
+  "type": "module",
+  "allowScripts": {
+    "fsevents@2.3.2": true,
+    "fsevents@2.3.3": true
+  }
+}
