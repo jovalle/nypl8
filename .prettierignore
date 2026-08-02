@@ -1,0 +1,10 @@
+.next
+node_modules
+backend/node_modules
+data
+playwright-report
+test-results
+public/*.png
+docs/screenshots/*
+package-lock.json
+backend/package-lock.json

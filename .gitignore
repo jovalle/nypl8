@@ -21,7 +21,7 @@ node_modules/
 /.next/
 /out/
 
-# local persistent data (self-hosted plate store)
+# public aggregate lookup statistics (runtime data)
 /data/
 
 # misc
@@ -48,4 +48,3 @@ yarn-error.log*
 next-env.d.ts
 *.tsbuildinfo
 /dist/
-

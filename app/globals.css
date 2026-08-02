@@ -16,11 +16,11 @@
 }
 
 @font-face {
-  font-family: "License Plate USA";
+  font-family: 'License Plate USA';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
-  src: url("/fonts/license-plate-usa.ttf") format("truetype");
+  src: url('/fonts/license-plate-usa.ttf') format('truetype');
 }
 
 * {
@@ -39,7 +39,7 @@ body {
     ui-sans-serif,
     -apple-system,
     BlinkMacSystemFont,
-    "Segoe UI",
+    'Segoe UI',
     sans-serif;
   margin: 0;
   -webkit-font-smoothing: antialiased;
@@ -226,11 +226,22 @@ h1 {
   margin: 9px 0 0;
 }
 
+.storage-note {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 10px 2px 0;
+}
+
 .lookup-list {
   border-top: 1px solid var(--line);
   display: grid;
   gap: 16px;
   padding: 28px 0 48px;
+}
+
+.lookup-hydration-space {
+  min-height: 280px;
 }
 
 .lookup-card-shell {
@@ -442,7 +453,7 @@ h1 {
   border: 2px solid currentColor;
   border-bottom: 0;
   border-radius: 2px 2px 0 0;
-  content: "";
+  content: '';
   height: 3px;
   left: 4px;
   position: absolute;
@@ -465,7 +476,7 @@ h1 {
 .trash-can-body::after {
   background: currentColor;
   border-radius: 1px;
-  content: "";
+  content: '';
   height: 6px;
   position: absolute;
   top: 2px;
@@ -544,60 +555,13 @@ h1 {
   user-select: none;
 }
 
-.plate-registration-mask {
-  background: #fff;
-  bottom: 22.2%;
-  left: 8.7%;
-  position: absolute;
-  right: 8.7%;
-  top: 27.2%;
-}
-
-.plate-characters {
-  align-items: center;
-  color: #07316f;
-  display: flex;
-  font-family: "License Plate USA", Impact, sans-serif;
-  font-size: 23cqw;
-  font-weight: 400;
-  inset: 27.1% 0 21.4%;
-  justify-content: center;
-  line-height: 1;
-  position: absolute;
-  white-space: pre;
-  z-index: 2;
-}
-
-.plate-character-run {
-  align-items: center;
-  display: grid;
-  grid-template-columns: repeat(var(--plate-slot-count), minmax(0, 1fr));
+.plate-registration-pixels {
   height: 100%;
-  width: var(--plate-run-width);
-}
-
-.plate-character-run > span {
-  align-items: center;
-  display: flex;
-  justify-content: center;
-  min-width: 0;
-  text-align: center;
-}
-
-.plate-glyph {
-  text-shadow: 0.033em 0.043em 0 #d2d4d5;
-  transform: scaleX(0.79);
-}
-
-.plate-characters .ny-state {
-  background-image: url("/ny-state-symbol.png");
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: contain;
-  height: 0.45em;
-  justify-self: center;
-  width: 0.515em;
-  text-shadow: none;
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 100%;
+  z-index: 2;
 }
 
 .lookup-stats {
@@ -665,7 +629,8 @@ footer p {
 
 .capacity-page {
   align-items: center;
-  background: radial-gradient(circle at top, rgba(245, 170, 35, 0.16), transparent 40%), var(--soft);
+  background:
+    radial-gradient(circle at top, rgba(245, 170, 35, 0.16), transparent 40%), var(--soft);
   display: flex;
   justify-content: center;
   min-height: 100vh;

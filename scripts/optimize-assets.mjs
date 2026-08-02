@@ -1,8 +1,8 @@
-import { rename, rm, stat } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-import sharp from "sharp";
+import { rename, rm, stat } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import sharp from 'sharp';
 
-const assets = ["ny-excelsior-source.png", "ny-state-symbol.png"];
+const assets = ['ny-excelsior-source.png', 'ny-state-symbol.png'];
 
 for (const asset of assets) {
   const input = fileURLToPath(new URL(`../public/${asset}`, import.meta.url));

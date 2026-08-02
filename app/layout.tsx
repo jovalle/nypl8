@@ -1,34 +1,42 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
+const basePath =
+  process.env.NEXT_PUBLIC_PLATE_PANTRY_BASE_PATH ?? process.env.NEXT_PUBLIC_NYPL8_BASE_PATH ?? '';
+const publicOrigin =
+  process.env.PLATE_PANTRY_PUBLIC_ORIGIN ??
+  process.env.NYPL8_PUBLIC_ORIGIN ??
+  'http://localhost:5360';
+const canonicalPath = basePath || '/';
+
 export const metadata: Metadata = {
-  metadataBase: new URL('http://localhost:5360'),
-  title: 'nypl8 — NY personalized plate availability',
+  metadataBase: new URL(publicOrigin),
+  title: 'Plate Pantry — NY personalized plate availability',
   description:
     'Check multiple New York passenger personalized plate ideas against the official NY DMV service.',
-  applicationName: 'nypl8',
-  alternates: { canonical: '/' },
+  applicationName: 'Plate Pantry',
+  alternates: { canonical: canonicalPath },
   icons: {
-    icon: [{ url: '/ny-state-symbol.png', type: 'image/png', sizes: '78x68' }],
+    icon: [{ url: `${basePath}/ny-state-symbol.png`, type: 'image/png', sizes: '78x68' }],
   },
   openGraph: {
     type: 'website',
-    url: '/',
-    title: 'nypl8 — NY personalized plate availability',
+    url: canonicalPath,
+    title: 'Plate Pantry — NY personalized plate availability',
     description: 'Check personalized New York passenger plate ideas against the NY DMV.',
-    siteName: 'nypl8',
+    siteName: 'Plate Pantry',
   },
   robots: { index: true, follow: true },
 };
 
 export const viewport: Viewport = {
-  colorScheme: 'light',
+  colorScheme: 'light dark',
   themeColor: '#ffffff',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body>{children}</body>
     </html>
   );

@@ -1,0 +1,10 @@
+.git
+.github
+.next
+node_modules
+backend/node_modules
+data
+docs
+test-results
+tmp
+*.log

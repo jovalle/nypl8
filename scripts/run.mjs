@@ -6,9 +6,10 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const host = process.env.HOST ?? '127.0.0.1';
 const port = process.env.PORT ?? '5360';
 const backendPort = process.env.DMV_BACKEND_PORT ?? '8080';
-const dataDir = process.env.NYPL8_DATA_DIR ?? 'data';
 const displayHost = host === '0.0.0.0' ? '127.0.0.1' : host;
-const url = `http://${displayHost}:${port}`;
+const basePath =
+  process.env.NEXT_PUBLIC_PLATE_PANTRY_BASE_PATH ?? process.env.NEXT_PUBLIC_NYPL8_BASE_PATH ?? '';
+const url = `http://${displayHost}:${port}${basePath}`;
 
 // Build on first run so `just run` works without a separate step.
 if (!existsSync(new URL('../.next/BUILD_ID', import.meta.url))) {
@@ -30,7 +31,6 @@ const frontend = spawn(nextBin, ['start', '--hostname', host, '--port', port], {
   env: {
     ...process.env,
     DMV_BACKEND_URL: `http://127.0.0.1:${backendPort}`,
-    NYPL8_DATA_DIR: dataDir,
   },
 });
 
@@ -60,7 +60,7 @@ for (const child of [backend, frontend]) {
 }
 
 function openBrowser(target) {
-  if (process.env.NYPL8_NO_OPEN) return;
+  if (process.env.PLATE_PANTRY_NO_OPEN || process.env.NYPL8_NO_OPEN) return;
   try {
     if (process.platform === 'darwin') {
       spawn('open', [target], { stdio: 'ignore', detached: true }).unref();
@@ -80,7 +80,7 @@ async function openWhenReady(target) {
     try {
       const response = await fetch(target, { signal: AbortSignal.timeout(1_000) });
       if (response.status < 500) {
-        console.log(`\nnypl8 is running at ${target}`);
+        console.log(`\nPlate Pantry is running at ${target}`);
         openBrowser(target);
         return;
       }

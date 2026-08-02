@@ -1,5 +1,5 @@
 {
-  "name": "nypl8",
+  "name": "plate-pantry",
   "version": "0.1.0",
   "private": true,
   "license": "MIT",
@@ -12,13 +12,20 @@
     "dev:lan": "node scripts/dev-local.mjs --host 0.0.0.0",
     "build": "next build",
     "start": "node scripts/run.mjs",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "npm run test:unit && npm run test:backend",
-    "test:unit": "node --experimental-strip-types --test tests/plate-store.test.mts tests/rendered-html.test.mjs",
-    "test:backend": "node --test tests/backend-http.test.mjs",
+    "test": "npm run test:unit && npm run test:backend && npm run test:edge",
+    "test:unit": "node --experimental-strip-types --test tests/check-route.test.mts tests/plate-stats.test.mts tests/rendered-html.test.mjs",
+    "test:backend": "node --test tests/backend-http.test.mjs tests/dmv-proxy.test.mjs",
+    "test:edge": "node --experimental-strip-types --test tests/edge-worker.test.mts",
     "test:browser": "playwright test",
-    "check": "npm run lint && npm run typecheck && npm run build && npm test",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run build && npm test",
+    "ci:test": "npm run check && npm run test:browser",
+    "deploy:origin": "node scripts/deploy-origin.mjs",
+    "deploy:edge": "wrangler deploy",
+    "verify:production": "node scripts/verify-production.mjs",
     "assets:optimize": "node scripts/optimize-assets.mjs"
   },
   "dependencies": {
@@ -33,8 +40,10 @@
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.5",
     "eslint-config-next": "16.2.11",
+    "prettier": "3.9.6",
     "sharp": "0.35.3",
-    "typescript": "6.0.3"
+    "typescript": "6.0.3",
+    "wrangler": "4.118.0"
   },
   "overrides": {
     "@typescript-eslint/typescript-estree": {
@@ -54,6 +63,11 @@
   "type": "module",
   "allowScripts": {
     "fsevents@2.3.2": true,
-    "fsevents@2.3.3": true
+    "fsevents@2.3.3": true,
+    "sharp@0.34.5": true,
+    "sharp@0.35.3": true,
+    "unrs-resolver@1.11.1": true,
+    "esbuild@0.28.1": true,
+    "workerd@1.20260730.1": true
   }
 }

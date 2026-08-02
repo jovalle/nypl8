@@ -1,14 +1,21 @@
 'use client';
 
 import Image from 'next/image';
-import { CSSProperties, FormEvent, useEffect, useRef, useState } from 'react';
+import { FormEvent, useEffect, useRef, useState } from 'react';
 import { normalizePlate, normalizePlateDraft, validatePlate } from '../lib/plate-validation';
 
-const STORAGE_KEY = 'plate-scout-ny:v1';
+const STORAGE_KEY = 'plate-pantry:v1';
+const LEGACY_STORAGE_KEY = 'plate-scout-ny:v1';
 const DMV_URL = 'https://transact3.dmv.ny.gov/PlatesPersonalized/';
 const MAX_PLATES = 20;
 const CONCURRENCY = 1;
 const REMOVE_TRANSITION_MS = 280;
+const BASE_PATH =
+  process.env.NEXT_PUBLIC_PLATE_PANTRY_BASE_PATH ?? process.env.NEXT_PUBLIC_NYPL8_BASE_PATH ?? '';
+
+function appPath(path: string) {
+  return `${BASE_PATH}${path}`;
+}
 
 type PlateStatus = 'ready' | 'checking' | 'available' | 'unavailable' | 'error';
 
@@ -27,12 +34,19 @@ type CheckResponse = {
   status: 'available' | 'unavailable' | 'error';
   message: string;
   checkedAt: string;
+  lookupCount?: number;
+  previousCheckedAt?: string;
 };
+
+type PublicPlateStats = Pick<
+  SavedPlate,
+  'value' | 'lookupCount' | 'checkedAt' | 'previousCheckedAt'
+>;
 
 const SAMPLE_PLATES: SavedPlate[] = [
   {
-    id: 'sample-nypl8',
-    value: 'NYPL8',
+    id: 'sample-nyk-in-5',
+    value: 'NYK IN 5',
     status: 'ready',
     lookupCount: 0,
   },
@@ -49,48 +63,135 @@ function formatDate(value?: string) {
   }).format(date);
 }
 
-function PlatePreview({ value, priority = false }: { value: string; priority?: boolean }) {
-  const slotCount = Math.max(value.length, 1);
-  const runWidth = Math.min(79.2, slotCount * 9.9);
+async function fetchPublicPlateStats(value: string): Promise<PublicPlateStats | null> {
+  try {
+    const response = await fetch(appPath(`/api/stats?plate=${encodeURIComponent(value)}`), {
+      cache: 'no-store',
+    });
+    if (!response.ok) return null;
+    const stats = (await response.json()) as {
+      plate?: unknown;
+      lookupCount?: unknown;
+      checkedAt?: unknown;
+      previousCheckedAt?: unknown;
+    };
+    if (stats.plate !== value || !Number.isFinite(stats.lookupCount)) return null;
+    return {
+      value,
+      lookupCount: Math.max(0, Math.trunc(Number(stats.lookupCount))),
+      checkedAt: typeof stats.checkedAt === 'string' ? stats.checkedAt : undefined,
+      previousCheckedAt:
+        typeof stats.previousCheckedAt === 'string' ? stats.previousCheckedAt : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
 
+function PlateRegistrationPixels({ value }: { value: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const target = canvas;
+    const drawingContext = context;
+
+    const plateWidth = 660;
+    const plateHeight = 343;
+    const fontSize = plateWidth * 0.23;
+    const slotCount = Math.max(value.length, 1);
+    const runWidth = plateWidth * (Math.min(79.2, slotCount * 9.9) / 100);
+    const slotWidth = runWidth / slotCount;
+    const runStart = (plateWidth - runWidth) / 2;
+    // Anchor the visible registration, not the font's engine-specific em box.
+    const registrationCenterY = plateHeight * 0.523;
+    const stateSymbolCenterY = registrationCenterY;
+    const stateSymbol = new window.Image();
+    let disposed = false;
+
+    function draw() {
+      if (disposed) return;
+
+      drawingContext.setTransform(1, 0, 0, 1, 0, 0);
+      drawingContext.clearRect(0, 0, target.width, target.height);
+      drawingContext.scale(target.width / plateWidth, target.height / plateHeight);
+
+      drawingContext.font = `400 ${fontSize}px "License Plate USA", Impact, sans-serif`;
+      drawingContext.textAlign = 'center';
+      drawingContext.textBaseline = 'alphabetic';
+
+      Array.from(value).forEach((character, index) => {
+        const centerX = runStart + slotWidth * (index + 0.5);
+        if (character === ' ') return;
+
+        if (character === '@') {
+          if (!stateSymbol.complete || !stateSymbol.naturalWidth) return;
+          const height = fontSize * 0.45;
+          const width = fontSize * 0.515;
+          drawingContext.drawImage(
+            stateSymbol,
+            centerX - width / 2,
+            stateSymbolCenterY - height / 2,
+            width,
+            height,
+          );
+          return;
+        }
+
+        drawingContext.save();
+        drawingContext.translate(centerX, registrationCenterY);
+        drawingContext.scale(0.79, 1);
+        drawingContext.fillStyle = '#07316f';
+        drawingContext.shadowColor = '#d2d4d5';
+        drawingContext.shadowOffsetX = fontSize * 0.033;
+        drawingContext.shadowOffsetY = fontSize * 0.043;
+        const metrics = drawingContext.measureText(character);
+        const ascent = metrics.actualBoundingBoxAscent || fontSize * 0.5;
+        const descent = metrics.actualBoundingBoxDescent || fontSize * 0.1;
+        drawingContext.fillText(character, 0, (ascent - descent) / 2);
+        drawingContext.restore();
+      });
+    }
+
+    draw();
+    stateSymbol.addEventListener('load', draw);
+    stateSymbol.src = appPath('/ny-state-symbol.png');
+    void document.fonts.load(`400 ${fontSize}px "License Plate USA"`).then(draw);
+
+    return () => {
+      disposed = true;
+      stateSymbol.removeEventListener('load', draw);
+    };
+  }, [value]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="plate-registration-pixels"
+      width={1320}
+      height={686}
+      aria-hidden="true"
+    />
+  );
+}
+
+function PlatePreview({ value, priority = false }: { value: string; priority?: boolean }) {
   return (
     <div className="ny-plate" role="img" aria-label={`New York passenger plate ${value}`}>
       <Image
         className="plate-artwork"
-        src="/ny-excelsior-source.png"
+        src={appPath('/ny-excelsior-base.png')}
         alt=""
         fill
         priority={priority}
         sizes="(min-width: 620px) 430px, calc(100vw - 66px)"
         aria-hidden="true"
       />
-      <span className="plate-registration-mask" aria-hidden="true" />
-      <div className="plate-characters" aria-hidden="true">
-        <div
-          className="plate-character-run"
-          style={
-            {
-              '--plate-slot-count': slotCount,
-              '--plate-run-width': `${runWidth}%`,
-            } as CSSProperties
-          }
-        >
-          {Array.from(value).map((character, index) => {
-            if (character === ' ')
-              return (
-                <span className="plate-space" key={index}>
-                  &nbsp;
-                </span>
-              );
-            if (character === '@') return <span className="ny-state" key={index} />;
-            return (
-              <span className="plate-glyph" key={index}>
-                {character}
-              </span>
-            );
-          })}
-        </div>
-      </div>
+      <PlateRegistrationPixels value={value} />
     </div>
   );
 }
@@ -112,7 +213,7 @@ function Status({ status }: { status: PlateStatus }) {
 }
 
 export default function Home() {
-  const [plates, setPlates] = useState<SavedPlate[]>(SAMPLE_PLATES);
+  const [plates, setPlates] = useState<SavedPlate[]>([]);
   const [draft, setDraft] = useState('');
   const [inputError, setInputError] = useState('');
   const [hydrated, setHydrated] = useState(false);
@@ -122,77 +223,49 @@ export default function Home() {
   const removeTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
-    let cancelled = false;
-
     function normalize(
       parsed: Array<Partial<SavedPlate> & Pick<SavedPlate, 'id' | 'value' | 'status'>>,
     ): SavedPlate[] {
       return parsed
         .filter((plate) => !plate.id.startsWith('sample-'))
         .map((plate) => ({
-          ...plate,
+          id: plate.id,
+          value: plate.value,
           status: plate.status === 'checking' ? ('ready' as const) : plate.status,
-          lookupCount: plate.lookupCount ?? (plate.checkedAt ? 1 : 0),
+          lookupCount: 0,
+          message: plate.message,
         }));
     }
 
     function fromLocalStorage(): SavedPlate[] {
       try {
-        const saved = window.localStorage.getItem(STORAGE_KEY);
+        const saved =
+          window.localStorage.getItem(STORAGE_KEY) ??
+          window.localStorage.getItem(LEGACY_STORAGE_KEY);
         return saved ? normalize(JSON.parse(saved)) : [];
       } catch {
         return [];
       }
     }
 
-    async function load() {
-      let userPlates: SavedPlate[] = [];
-      try {
-        const response = await fetch('/api/plates', { cache: 'no-store' });
-        if (response.ok) {
-          const serverPlates = normalize(await response.json());
-          // Server is authoritative once it holds data; otherwise adopt any
-          // existing browser copy (first-run migration or offline use).
-          userPlates = serverPlates.length ? serverPlates : fromLocalStorage();
-        } else {
-          userPlates = fromLocalStorage();
-        }
-      } catch {
-        userPlates = fromLocalStorage();
-      }
-      if (cancelled) return;
-      setPlates(userPlates.length ? userPlates : SAMPLE_PLATES);
-      setHydrated(true);
-    }
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
+    const savedPlates = fromLocalStorage();
+    const initialPlates = savedPlates.length ? savedPlates : SAMPLE_PLATES;
+    setPlates(initialPlates);
+    setHydrated(true);
+    void refreshPublicStats(initialPlates);
   }, []);
 
   useEffect(() => {
     if (!hydrated) return;
-    const userPlates = plates.filter((plate) => !plate.id.startsWith('sample-'));
+    const userPlates = plates
+      .filter((plate) => !plate.id.startsWith('sample-'))
+      .map(({ id, value, status, message }) => ({ id, value, status, message }));
 
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(userPlates));
     } catch {
-      // Ignore storage failures (e.g. private mode); the server copy is authoritative.
+      // Keep the in-memory list usable if browser storage is unavailable.
     }
-
-    const timer = setTimeout(() => {
-      void fetch('/api/plates', {
-        method: 'PUT',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(userPlates),
-        keepalive: true,
-      }).catch(() => {
-        // Offline or server unavailable; the browser copy still holds the latest state.
-      });
-    }, 400);
-
-    return () => clearTimeout(timer);
   }, [plates, hydrated]);
 
   useEffect(() => {
@@ -227,6 +300,30 @@ export default function Home() {
     [],
   );
 
+  async function refreshPublicStats(items: SavedPlate[]) {
+    const stats = await Promise.all(items.map((plate) => fetchPublicPlateStats(plate.value)));
+    const byValue = new Map(
+      stats
+        .filter((item): item is PublicPlateStats => Boolean(item))
+        .map((item) => [item.value, item]),
+    );
+    if (!byValue.size) return;
+
+    setPlates((current) =>
+      current.map((plate) => {
+        const publicStats = byValue.get(plate.value);
+        return publicStats
+          ? {
+              ...plate,
+              lookupCount: publicStats.lookupCount,
+              checkedAt: publicStats.checkedAt,
+              previousCheckedAt: publicStats.previousCheckedAt,
+            }
+          : plate;
+      }),
+    );
+  }
+
   async function checkPlate(plate: SavedPlate) {
     setPlates((current) =>
       current.map((item) =>
@@ -235,24 +332,23 @@ export default function Home() {
     );
 
     try {
-      const response = await fetch('/api/check', {
+      const response = await fetch(appPath('/api/check'), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ plate: plate.value }),
         signal: AbortSignal.timeout(45_000),
       });
       const result = (await response.json()) as CheckResponse;
-      if (!response.ok) throw new Error(result.message || 'The lookup could not be completed.');
       setPlates((current) =>
         current.map((item) =>
           item.id === plate.id
             ? {
                 ...item,
-                status: result.status,
+                status: response.ok ? result.status : 'error',
                 message: result.message,
-                previousCheckedAt: item.checkedAt,
-                checkedAt: result.checkedAt,
-                lookupCount: item.lookupCount + 1,
+                previousCheckedAt: result.previousCheckedAt ?? item.checkedAt,
+                checkedAt: result.checkedAt ?? item.checkedAt,
+                lookupCount: result.lookupCount ?? item.lookupCount + 1,
               }
             : item,
         ),
@@ -266,9 +362,6 @@ export default function Home() {
                 status: 'error',
                 message:
                   error instanceof Error ? error.message : 'The DMV lookup could not be completed.',
-                previousCheckedAt: item.checkedAt,
-                checkedAt: new Date().toISOString(),
-                lookupCount: item.lookupCount + 1,
               }
             : item,
         ),
@@ -322,9 +415,10 @@ export default function Home() {
         ...newPlates,
         ...current.filter((plate) => !plate.id.startsWith('sample-')),
       ]);
+    const platesToCheck = [...newPlates, ...existingPlates];
     setDraft('');
     setInputError('');
-    void checkMany([...newPlates, ...existingPlates]);
+    void refreshPublicStats(platesToCheck).then(() => checkMany(platesToCheck));
   }
 
   function handleSubmit(event: FormEvent) {
@@ -353,8 +447,8 @@ export default function Home() {
     <div className="site-shell">
       <main id="top">
         <section className="lookup-intro">
-          <h1>Grab a NY Plate</h1>
-          <p>Personalized plates in NY.</p>
+          <h1>Plate Pantry</h1>
+          <p>Your pantry of Empire State personalized plate ideas.</p>
 
           <form onSubmit={handleSubmit} className="plate-form">
             <label className="sr-only" htmlFor="plate-input">
@@ -388,6 +482,9 @@ export default function Home() {
             ) : (
               <span id="plate-error" />
             )}
+            <p className="storage-note">
+              Plate buckets stay in this browser. Lookup counts and query dates are public.
+            </p>
           </form>
         </section>
 
@@ -395,105 +492,113 @@ export default function Home() {
           className="lookup-list"
           aria-label="Plate lookups"
           aria-live="polite"
-          aria-busy={plates.some((plate) => plate.status === 'checking')}
+          aria-busy={!hydrated || plates.some((plate) => plate.status === 'checking')}
         >
-          {plates.map((plate, index) => (
-            <div
-              className={`lookup-card-shell${removingPlateIds.has(plate.id) ? ' is-removing' : ''}`}
-              key={plate.id}
-            >
-              <article className={`lookup-card lookup-${plate.status}`}>
-                <div className="card-header">
-                  <Status status={plate.status} />
-                  <div className="card-actions">
-                    <button
-                      className="refresh-card"
-                      type="button"
-                      onClick={() => checkPlate(plate)}
-                      disabled={plate.status === 'checking'}
-                      aria-label={`Refresh ${plate.value} lookup`}
-                      title="Check again"
-                    >
-                      <span aria-hidden="true">↻</span>
-                    </button>
-                    <button
-                      className={`close-card${removeConfirmId === plate.id ? ' is-confirming' : ''}`}
-                      type="button"
-                      data-remove-card-id={plate.id}
-                      onClick={() => {
-                        if (removeConfirmId === plate.id) {
-                          removePlate(plate.id);
-                        } else {
-                          setRemoveConfirmId(plate.id);
-                        }
-                      }}
-                      aria-label={
-                        removeConfirmId === plate.id
-                          ? `Confirm removal of ${plate.value}`
-                          : `Remove ${plate.value} lookup`
-                      }
-                      aria-describedby={
-                        removeConfirmId === plate.id ? `remove-confirm-${plate.id}` : undefined
-                      }
-                      title={
-                        removeConfirmId === plate.id ? 'Click again to remove' : 'Remove lookup'
-                      }
-                      onBlur={() => {
-                        if (removeConfirmId === plate.id) setRemoveConfirmId(null);
-                      }}
-                    >
-                      {removeConfirmId === plate.id ? (
-                        <>
-                          <span className="confirm-label" aria-hidden="true">
-                            Delete?
-                          </span>
-                          <span className="trash-can" aria-hidden="true">
-                            <span className="trash-can-lid" />
-                            <span className="trash-can-body" />
-                          </span>
-                        </>
-                      ) : (
-                        <span className="close-mark" aria-hidden="true">
-                          &times;
-                        </span>
-                      )}
-                    </button>
-                    <span
-                      className="sr-only"
-                      id={`remove-confirm-${plate.id}`}
-                      role="status"
-                      aria-live="polite"
-                    >
-                      {removeConfirmId === plate.id
-                        ? 'Removal armed. Activate again to confirm, press Escape, or move focus away to cancel.'
-                        : ''}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="plate-content">
-                  <div className="plate-stage">
-                    <PlatePreview value={plate.value} priority={index === 0} />
-                  </div>
-
-                  <dl className="lookup-stats">
-                    <div>
-                      <dt>Lookups</dt>
-                      <dd>{plate.lookupCount}</dd>
-                    </div>
-                    <div>
-                      <dt>Queried on</dt>
-                      <dd>{formatDate(plate.checkedAt)}</dd>
-                    </div>
-                    <div>
-                      <dt>Prev. queried</dt>
-                      <dd>{formatDate(plate.previousCheckedAt)}</dd>
-                    </div>
-                  </dl>
-                </div>
-              </article>
+          {!hydrated ? (
+            <div className="lookup-hydration-space" role="status">
+              <span className="sr-only">Loading saved plate lookups…</span>
             </div>
-          ))}
+          ) : null}
+
+          {hydrated
+            ? plates.map((plate, index) => (
+                <div
+                  className={`lookup-card-shell${removingPlateIds.has(plate.id) ? ' is-removing' : ''}`}
+                  key={plate.id}
+                >
+                  <article className={`lookup-card lookup-${plate.status}`}>
+                    <div className="card-header">
+                      <Status status={plate.status} />
+                      <div className="card-actions">
+                        <button
+                          className="refresh-card"
+                          type="button"
+                          onClick={() => checkPlate(plate)}
+                          disabled={plate.status === 'checking'}
+                          aria-label={`Refresh ${plate.value} lookup`}
+                          title="Check again"
+                        >
+                          <span aria-hidden="true">↻</span>
+                        </button>
+                        <button
+                          className={`close-card${removeConfirmId === plate.id ? ' is-confirming' : ''}`}
+                          type="button"
+                          data-remove-card-id={plate.id}
+                          onClick={() => {
+                            if (removeConfirmId === plate.id) {
+                              removePlate(plate.id);
+                            } else {
+                              setRemoveConfirmId(plate.id);
+                            }
+                          }}
+                          aria-label={
+                            removeConfirmId === plate.id
+                              ? `Confirm removal of ${plate.value}`
+                              : `Remove ${plate.value} lookup`
+                          }
+                          aria-describedby={
+                            removeConfirmId === plate.id ? `remove-confirm-${plate.id}` : undefined
+                          }
+                          title={
+                            removeConfirmId === plate.id ? 'Click again to remove' : 'Remove lookup'
+                          }
+                          onBlur={() => {
+                            if (removeConfirmId === plate.id) setRemoveConfirmId(null);
+                          }}
+                        >
+                          {removeConfirmId === plate.id ? (
+                            <>
+                              <span className="confirm-label" aria-hidden="true">
+                                Delete?
+                              </span>
+                              <span className="trash-can" aria-hidden="true">
+                                <span className="trash-can-lid" />
+                                <span className="trash-can-body" />
+                              </span>
+                            </>
+                          ) : (
+                            <span className="close-mark" aria-hidden="true">
+                              &times;
+                            </span>
+                          )}
+                        </button>
+                        <span
+                          className="sr-only"
+                          id={`remove-confirm-${plate.id}`}
+                          role="status"
+                          aria-live="polite"
+                        >
+                          {removeConfirmId === plate.id
+                            ? 'Removal armed. Activate again to confirm, press Escape, or move focus away to cancel.'
+                            : ''}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="plate-content">
+                      <div className="plate-stage">
+                        <PlatePreview value={plate.value} priority={index === 0} />
+                      </div>
+
+                      <dl className="lookup-stats">
+                        <div>
+                          <dt>Lookups</dt>
+                          <dd>{plate.lookupCount}</dd>
+                        </div>
+                        <div>
+                          <dt>Queried on</dt>
+                          <dd>{formatDate(plate.checkedAt)}</dd>
+                        </div>
+                        <div>
+                          <dt>Prev. queried</dt>
+                          <dd>{formatDate(plate.previousCheckedAt)}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                  </article>
+                </div>
+              ))
+            : null}
 
           {!plates.length && hydrated ? (
             <div className="empty-state">
@@ -505,10 +610,8 @@ export default function Home() {
 
       <footer>
         <a href={DMV_URL} target="_blank" rel="noreferrer">
-          NY DMV personalized plates ↗
+          NY DMV Personalized Plates Portal ↗
         </a>
-        <p>Availability can change and remains subject to DMV review.</p>
-        <p>Plate ideas are saved on this machine. Availability comes straight from the NY DMV.</p>
         <p className="maker-credit">
           made by{' '}
           <a
