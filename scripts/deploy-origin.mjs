@@ -1,13 +1,20 @@
 const apiUrl = process.env.COOLIFY_API_URL ?? 'https://apps.techn.is';
 const applicationUuid = process.env.COOLIFY_APPLICATION_UUID ?? 'qusmquyldrrqdpzy19xre2oe';
 const token = process.env.COOLIFY_DEPLOY_TOKEN;
+const accessClientId = process.env.COOLIFY_ACCESS_CLIENT_ID;
+const accessClientSecret = process.env.COOLIFY_ACCESS_CLIENT_SECRET;
 
 if (!token) throw new Error('COOLIFY_DEPLOY_TOKEN is required.');
+if (!accessClientId || !accessClientSecret) {
+  throw new Error('COOLIFY_ACCESS_CLIENT_ID and COOLIFY_ACCESS_CLIENT_SECRET are required.');
+}
 
 const headers = {
   authorization: `Bearer ${token}`,
   accept: 'application/json',
   'content-type': 'application/json',
+  'cf-access-client-id': accessClientId,
+  'cf-access-client-secret': accessClientSecret,
 };
 
 const deploymentResponse = await fetch(`${apiUrl}/api/v1/deploy`, {
