@@ -15,7 +15,7 @@ test('relays the Plate Pantry path and preserves its request', async () => {
 
   assert.equal(
     forwarded?.url,
-    'https://nypl8-origin.techn.is/plate-pantry/api/stats?plate=NYK%20IN%205',
+    'https://plate-pantry-origin.jayro.dev/plate-pantry/api/stats?plate=NYK%20IN%205',
   );
   assert.equal(forwarded?.headers.get('x-forwarded-host'), 'jayro.dev');
   assert.equal(response.status, 200);

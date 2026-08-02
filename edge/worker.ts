@@ -1,4 +1,4 @@
-const ORIGIN = 'https://nypl8-origin.techn.is';
+const ORIGIN = 'https://plate-pantry-origin.jayro.dev';
 const CURRENT_PATH = '/plate-pantry';
 const LEGACY_PATH = '/nypl8';
 

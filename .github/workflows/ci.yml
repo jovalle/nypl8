@@ -65,7 +65,7 @@ jobs:
       - name: Verify the origin
         run: npm run verify:production
         env:
-          PLATE_PANTRY_VERIFY_URL: https://nypl8-origin.techn.is/plate-pantry
+          PLATE_PANTRY_VERIFY_URL: https://plate-pantry-origin.jayro.dev/plate-pantry
           PLATE_PANTRY_VERIFY_EDGE: '0'
       - name: Publish the Cloudflare edge route
         run: npm run deploy:edge -- --message "GitHub $GITHUB_SHA"
