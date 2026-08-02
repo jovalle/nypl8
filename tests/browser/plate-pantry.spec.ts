@@ -22,7 +22,24 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('renders an accessible, responsive plate workspace', async ({ page }) => {
+  const plateFontResponse = page.waitForResponse((response) =>
+    response.url().endsWith('/fonts/license-plate-usa.ttf'),
+  );
   await page.goto(appPath());
+
+  const fontResponse = await plateFontResponse;
+  expect(fontResponse.ok()).toBe(true);
+  expect(new URL(fontResponse.url()).pathname).toBe(appPath('/fonts/license-plate-usa.ttf'));
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Array.from(document.fonts).some(
+          (font) =>
+            font.family.replaceAll('"', '') === 'License Plate USA' && font.status === 'loaded',
+        ),
+      ),
+    )
+    .toBe(true);
 
   await expect(page).toHaveTitle(/Plate Pantry/);
   await expect(page.getByRole('heading', { name: 'Plate Pantry' })).toBeVisible();

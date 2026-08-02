@@ -157,7 +157,6 @@ function PlateRegistrationPixels({ value }: { value: string }) {
       });
     }
 
-    draw();
     stateSymbol.addEventListener('load', draw);
     stateSymbol.src = appPath('/ny-state-symbol.png');
     void document.fonts.load(`400 ${fontSize}px "License Plate USA"`).then(draw);

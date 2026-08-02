@@ -15,14 +15,6 @@
   --amber-soft: #fff7e8;
 }
 
-@font-face {
-  font-family: 'License Plate USA';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/license-plate-usa.ttf') format('truetype');
-}
-
 * {
   box-sizing: border-box;
 }

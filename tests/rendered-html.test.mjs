@@ -69,15 +69,17 @@ test('serves hardened document headers from Next.js', async () => {
 });
 
 test('keeps plate entry accessible and renders supplied artwork', async () => {
-  const [page, validation, css] = await Promise.all([
+  const [page, layout, validation, css] = await Promise.all([
     read('app/page.tsx'),
+    read('app/layout.tsx'),
     read('lib/plate-validation.ts'),
     read('app/globals.css'),
   ]);
 
   assert.doesNotMatch(validation.match(/normalizePlateDraft[\s\S]*?\n\}/)?.[0] ?? '', /trim\(/);
   assert.match(page, /\/ny-excelsior-base\.png/);
-  assert.match(css, /License Plate USA/);
+  assert.match(layout, /\$\{basePath\}\/fonts\/license-plate-usa\.ttf/);
+  assert.doesNotMatch(css, /url\('\/fonts\/license-plate-usa\.ttf'\)/);
   assert.match(css, /\.plate-registration-pixels/);
   assert.match(page, /<canvas/);
   assert.match(page, /stateSymbolCenterY = registrationCenterY/);

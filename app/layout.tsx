@@ -37,6 +37,17 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        <style>{`
+          @font-face {
+            font-family: 'License Plate USA';
+            font-style: normal;
+            font-weight: 400;
+            font-display: block;
+            src: url('${basePath}/fonts/license-plate-usa.ttf') format('truetype');
+          }
+        `}</style>
+      </head>
       <body>{children}</body>
     </html>
   );
