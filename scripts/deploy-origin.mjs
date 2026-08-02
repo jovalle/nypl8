@@ -24,7 +24,13 @@ const deploymentResponse = await fetch(`${apiUrl}/api/v1/deploy`, {
 });
 
 if (!deploymentResponse.ok) {
-  throw new Error(`Coolify rejected the deployment (${deploymentResponse.status}).`);
+  const responseText = (await deploymentResponse.text()).replace(/\s+/g, ' ').slice(0, 500);
+  const responseSource = deploymentResponse.headers.get('cf-mitigated')
+    ? 'Cloudflare Access'
+    : (deploymentResponse.headers.get('content-type') ?? 'unknown source');
+  throw new Error(
+    `Coolify rejected the deployment (${deploymentResponse.status}, ${responseSource}): ${responseText}`,
+  );
 }
 
 const deploymentPayload = await deploymentResponse.json();
