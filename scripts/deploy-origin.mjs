@@ -1,4 +1,4 @@
-const apiUrl = process.env.COOLIFY_API_URL ?? 'https://apps.techn.is';
+const apiUrl = process.env.COOLIFY_API_URL ?? 'https://coolify-api.jayro.dev';
 const applicationUuid = process.env.COOLIFY_APPLICATION_UUID ?? 'qusmquyldrrqdpzy19xre2oe';
 const token = process.env.COOLIFY_DEPLOY_TOKEN;
 const accessClientId = process.env.COOLIFY_ACCESS_CLIENT_ID;

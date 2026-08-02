@@ -58,6 +58,7 @@ jobs:
       - name: Deploy the origin through Coolify
         run: npm run deploy:origin
         env:
+          COOLIFY_API_URL: https://coolify-api.jayro.dev
           COOLIFY_DEPLOY_TOKEN: ${{ secrets.COOLIFY_DEPLOY_TOKEN }}
           COOLIFY_ACCESS_CLIENT_ID: ${{ secrets.COOLIFY_ACCESS_CLIENT_ID }}
           COOLIFY_ACCESS_CLIENT_SECRET: ${{ secrets.COOLIFY_ACCESS_CLIENT_SECRET }}
