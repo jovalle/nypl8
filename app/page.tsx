@@ -111,10 +111,22 @@ function PlateRegistrationPixels({ value }: { value: string }) {
     const registrationCenterY = plateHeight * 0.523;
     const stateSymbolCenterY = registrationCenterY;
     const stateSymbol = new window.Image();
+    const resizeObserver = new ResizeObserver(draw);
     let disposed = false;
+    let fontReady = false;
 
     function draw() {
-      if (disposed) return;
+      if (disposed || !fontReady) return;
+
+      // Render at an integer multiple of the displayed size so diagonals are
+      // supersampled without the uneven rescaling caused by a fixed bitmap.
+      const pixelRatio = Math.min((window.devicePixelRatio || 1) * 2, 3);
+      const outputWidth = Math.max(1, Math.round(target.clientWidth * pixelRatio));
+      const outputHeight = Math.max(1, Math.round((outputWidth * plateHeight) / plateWidth));
+      if (target.width !== outputWidth || target.height !== outputHeight) {
+        target.width = outputWidth;
+        target.height = outputHeight;
+      }
 
       drawingContext.setTransform(1, 0, 0, 1, 0, 0);
       drawingContext.clearRect(0, 0, target.width, target.height);
@@ -159,10 +171,15 @@ function PlateRegistrationPixels({ value }: { value: string }) {
 
     stateSymbol.addEventListener('load', draw);
     stateSymbol.src = appPath('/ny-state-symbol.png');
-    void document.fonts.load(`400 ${fontSize}px "License Plate USA"`).then(draw);
+    resizeObserver.observe(target);
+    void document.fonts.load(`400 ${fontSize}px "License Plate USA"`).then(() => {
+      fontReady = true;
+      draw();
+    });
 
     return () => {
       disposed = true;
+      resizeObserver.disconnect();
       stateSymbol.removeEventListener('load', draw);
     };
   }, [value]);
@@ -171,8 +188,8 @@ function PlateRegistrationPixels({ value }: { value: string }) {
     <canvas
       ref={canvasRef}
       className="plate-registration-pixels"
-      width={1320}
-      height={686}
+      width={660}
+      height={343}
       aria-hidden="true"
     />
   );

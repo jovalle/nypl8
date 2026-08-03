@@ -56,6 +56,19 @@ test('renders an accessible, responsive plate workspace', async ({ page }) => {
     .poll(() =>
       registration.evaluate((element) => {
         const canvas = element as HTMLCanvasElement;
+        const displayWidth = canvas.getBoundingClientRect().width;
+        const pixelRatio = Math.min((window.devicePixelRatio || 1) * 2, 3);
+        return (
+          canvas.width === Math.round(displayWidth * pixelRatio) &&
+          canvas.height === Math.round((canvas.width * 343) / 660)
+        );
+      }),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      registration.evaluate((element) => {
+        const canvas = element as HTMLCanvasElement;
         const pixels = canvas
           .getContext('2d')
           ?.getImageData(0, 0, canvas.width, canvas.height).data;
