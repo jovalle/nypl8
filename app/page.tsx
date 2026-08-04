@@ -8,7 +8,6 @@ const STORAGE_KEY = 'plate-pantry:v1';
 const LEGACY_STORAGE_KEY = 'plate-scout-ny:v1';
 const DMV_URL = 'https://transact3.dmv.ny.gov/PlatesPersonalized/';
 const MAX_PLATES = 20;
-const CONCURRENCY = 1;
 const REMOVE_TRANSITION_MS = 280;
 const BASE_PATH =
   process.env.NEXT_PUBLIC_PLATE_PANTRY_BASE_PATH ?? process.env.NEXT_PUBLIC_NYPL8_BASE_PATH ?? '';
@@ -25,7 +24,6 @@ type SavedPlate = {
   status: PlateStatus;
   lookupCount: number;
   checkedAt?: string;
-  previousCheckedAt?: string;
   message?: string;
 };
 
@@ -35,13 +33,17 @@ type CheckResponse = {
   message: string;
   checkedAt: string;
   lookupCount?: number;
-  previousCheckedAt?: string;
 };
 
-type PublicPlateStats = Pick<
-  SavedPlate,
-  'value' | 'lookupCount' | 'checkedAt' | 'previousCheckedAt'
->;
+type SavedLookupStatus = Exclude<PlateStatus, 'ready' | 'checking'>;
+
+type PublicPlateStats = {
+  value: string;
+  lookupCount: number;
+  status?: SavedLookupStatus;
+  message?: string;
+  checkedAt?: string;
+};
 
 const SAMPLE_PLATES: SavedPlate[] = [
   {
@@ -72,16 +74,20 @@ async function fetchPublicPlateStats(value: string): Promise<PublicPlateStats | 
     const stats = (await response.json()) as {
       plate?: unknown;
       lookupCount?: unknown;
+      status?: unknown;
+      message?: unknown;
       checkedAt?: unknown;
-      previousCheckedAt?: unknown;
     };
     if (stats.plate !== value || !Number.isFinite(stats.lookupCount)) return null;
     return {
       value,
       lookupCount: Math.max(0, Math.trunc(Number(stats.lookupCount))),
+      status:
+        stats.status === 'available' || stats.status === 'unavailable' || stats.status === 'error'
+          ? stats.status
+          : undefined,
+      message: typeof stats.message === 'string' ? stats.message : undefined,
       checkedAt: typeof stats.checkedAt === 'string' ? stats.checkedAt : undefined,
-      previousCheckedAt:
-        typeof stats.previousCheckedAt === 'string' ? stats.previousCheckedAt : undefined,
     };
   } catch {
     return null;
@@ -323,7 +329,7 @@ export default function Home() {
         .filter((item): item is PublicPlateStats => Boolean(item))
         .map((item) => [item.value, item]),
     );
-    if (!byValue.size) return;
+    if (!byValue.size) return byValue;
 
     setPlates((current) =>
       current.map((plate) => {
@@ -332,12 +338,14 @@ export default function Home() {
           ? {
               ...plate,
               lookupCount: publicStats.lookupCount,
+              status: publicStats.status ?? plate.status,
+              message: publicStats.status ? publicStats.message : plate.message,
               checkedAt: publicStats.checkedAt,
-              previousCheckedAt: publicStats.previousCheckedAt,
             }
           : plate;
       }),
     );
+    return byValue;
   }
 
   async function checkPlate(plate: SavedPlate) {
@@ -362,7 +370,6 @@ export default function Home() {
                 ...item,
                 status: response.ok ? result.status : 'error',
                 message: result.message,
-                previousCheckedAt: result.previousCheckedAt ?? item.checkedAt,
                 checkedAt: result.checkedAt ?? item.checkedAt,
                 lookupCount: result.lookupCount ?? item.lookupCount + 1,
               }
@@ -385,15 +392,14 @@ export default function Home() {
     }
   }
 
-  async function checkMany(items: SavedPlate[]) {
-    const queue = [...items];
-    const workers = Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
-      while (queue.length) {
-        const next = queue.shift();
-        if (next) await checkPlate(next);
-      }
+  async function loadKnownOrCheckNew(items: SavedPlate[]) {
+    const statsByValue = await refreshPublicStats(items);
+    const platesWithoutHistory = items.filter((plate) => {
+      const stats = statsByValue.get(plate.value);
+      return !stats || stats.lookupCount === 0 || !stats.status;
     });
-    await Promise.all(workers);
+
+    for (const plate of platesWithoutHistory) await checkPlate(plate);
   }
 
   function addPlates(raw: string) {
@@ -431,10 +437,10 @@ export default function Home() {
         ...newPlates,
         ...current.filter((plate) => !plate.id.startsWith('sample-')),
       ]);
-    const platesToCheck = [...newPlates, ...existingPlates];
+    const platesToLoad = [...newPlates, ...existingPlates];
     setDraft('');
     setInputError('');
-    void refreshPublicStats(platesToCheck).then(() => checkMany(platesToCheck));
+    void loadKnownOrCheckNew(platesToLoad);
   }
 
   function handleSubmit(event: FormEvent) {
@@ -499,7 +505,8 @@ export default function Home() {
               <span id="plate-error" />
             )}
             <p className="storage-note">
-              Plate buckets stay in this browser. Lookup counts and query dates are public.
+              Plate buckets stay in this browser. Lookup counts, query dates, and latest statuses
+              are public.
             </p>
           </form>
         </section>
@@ -601,13 +608,9 @@ export default function Home() {
                           <dt>Lookups</dt>
                           <dd>{plate.lookupCount}</dd>
                         </div>
-                        <div>
-                          <dt>Queried on</dt>
+                        <div className="lookup-stat-last-query">
+                          <dt>Last queried</dt>
                           <dd>{formatDate(plate.checkedAt)}</dd>
-                        </div>
-                        <div>
-                          <dt>Prev. queried</dt>
-                          <dd>{formatDate(plate.previousCheckedAt)}</dd>
                         </div>
                       </dl>
                     </div>

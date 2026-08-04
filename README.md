@@ -2,9 +2,7 @@
 
 Your pantry of Empire State personalized plate ideas.
 
-Live at [jayro.dev/plate-pantry](https://jayro.dev/plate-pantry). Plate buckets stay in
-each visitor's browser; aggregate lookup counts and query dates are stored on the server and
-shown whenever that plate is added locally.
+Live at [jayro.dev/plate-pantry](https://jayro.dev/plate-pantry).
 
 ## Development
 

@@ -558,7 +558,7 @@ h1 {
 
 .lookup-stats {
   display: grid;
-  grid-template-rows: repeat(3, 1fr);
+  grid-template-rows: repeat(2, 1fr);
   margin: 0;
 }
 
@@ -588,6 +588,22 @@ h1 {
   font-size: 14px;
   font-weight: 750;
   margin: 0;
+}
+
+.lookup-stats .lookup-stat-last-query {
+  background: var(--soft);
+  border-left: 3px solid var(--gold);
+  padding-left: 12px;
+}
+
+.lookup-stats .lookup-stat-last-query dt,
+.lookup-stats .lookup-stat-last-query dd {
+  color: var(--navy);
+  font-weight: 800;
+}
+
+.lookup-stats .lookup-stat-last-query dd {
+  font-size: 16px;
 }
 
 .empty-state {
@@ -762,6 +778,12 @@ footer p {
   }
   .lookup-stats dd {
     font-size: 11px;
+  }
+  .lookup-stats .lookup-stat-last-query {
+    padding-left: 7px;
+  }
+  .lookup-stats .lookup-stat-last-query dd {
+    font-size: 12px;
   }
 }
 

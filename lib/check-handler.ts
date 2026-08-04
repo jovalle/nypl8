@@ -1,4 +1,4 @@
-import type { PublicPlateStats } from './plate-stats.ts';
+import type { PlateLookupResult, PublicPlateStats } from './plate-stats.ts';
 import { normalizePlate, validatePlate } from './plate-validation.ts';
 
 type BackendResult = {
@@ -10,7 +10,7 @@ type BackendResult = {
 
 type CheckHandlerOptions = {
   backendUrl: URL;
-  recordLookup: (plate: string, checkedAt: string) => Promise<PublicPlateStats>;
+  recordLookup: (plate: string, result: PlateLookupResult) => Promise<PublicPlateStats>;
   fetchBackend?: typeof fetch;
 };
 
@@ -48,9 +48,20 @@ export function createCheckHandler({
       const result = (await response.json()) as BackendResult;
       let stats: PublicPlateStats | null = null;
 
-      if (!validatePlate(plate) && result.checkedAt) {
+      if (
+        !validatePlate(plate) &&
+        result.checkedAt &&
+        (result.status === 'available' ||
+          result.status === 'unavailable' ||
+          result.status === 'error') &&
+        typeof result.message === 'string'
+      ) {
         try {
-          stats = await recordLookup(plate, result.checkedAt);
+          stats = await recordLookup(plate, {
+            status: result.status,
+            message: result.message,
+            checkedAt: result.checkedAt,
+          });
         } catch (error) {
           console.error('Could not record public plate statistics.', error);
         }

@@ -53,9 +53,10 @@ test('records successful API checks as public aggregate stats', async (context) 
     message: 'Available when checked with NY DMV.',
     checkedAt: timestamps[1],
     lookupCount: 2,
-    previousCheckedAt: timestamps[0],
   });
 
   const persisted = JSON.parse(await readFile(join(directory, 'plate-stats.json'), 'utf8'));
   assert.equal(persisted['ABC 123'].lookupCount, 2);
+  assert.equal(persisted['ABC 123'].status, 'available');
+  assert.equal(persisted['ABC 123'].message, 'Available when checked with NY DMV.');
 });

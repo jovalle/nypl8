@@ -5,8 +5,17 @@ import { normalizePlate, validatePlate } from './plate-validation.ts';
 export type PublicPlateStats = {
   plate: string;
   lookupCount: number;
+  status?: PlateLookupStatus;
+  message?: string;
   checkedAt?: string;
-  previousCheckedAt?: string;
+};
+
+export type PlateLookupStatus = 'available' | 'unavailable' | 'error';
+
+export type PlateLookupResult = {
+  status: PlateLookupStatus;
+  message: string;
+  checkedAt: string;
 };
 
 type StatsFile = Record<string, Omit<PublicPlateStats, 'plate'>>;
@@ -19,6 +28,14 @@ function cleanTimestamp(value: unknown): string | undefined {
     return undefined;
   }
   return value;
+}
+
+function cleanStatus(value: unknown): PlateLookupStatus | undefined {
+  return value === 'available' || value === 'unavailable' || value === 'error' ? value : undefined;
+}
+
+function cleanMessage(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length <= 500 ? value : undefined;
 }
 
 function sanitizeStatsFile(input: unknown): StatsFile {
@@ -35,8 +52,9 @@ function sanitizeStatsFile(input: unknown): StatsFile {
       lookupCount: Number.isFinite(count)
         ? Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.trunc(count)))
         : 0,
+      status: cleanStatus(stats.status),
+      message: cleanMessage(stats.message),
       checkedAt: cleanTimestamp(stats.checkedAt),
-      previousCheckedAt: cleanTimestamp(stats.previousCheckedAt),
     };
   }
   return result;
@@ -72,18 +90,23 @@ export function createPlateStatsStore(
     return current ? { plate, ...current } : { plate, lookupCount: 0 };
   }
 
-  function record(plateInput: string, checkedAtInput: string): Promise<PublicPlateStats> {
+  function record(plateInput: string, result: PlateLookupResult): Promise<PublicPlateStats> {
     const plate = normalizePlate(plateInput);
-    const checkedAt = cleanTimestamp(checkedAtInput);
-    if (validatePlate(plate) || !checkedAt) return Promise.reject(new Error('Invalid lookup.'));
+    const checkedAt = cleanTimestamp(result.checkedAt);
+    const status = cleanStatus(result.status);
+    const message = cleanMessage(result.message);
+    if (validatePlate(plate) || !checkedAt || !status || message === undefined) {
+      return Promise.reject(new Error('Invalid lookup.'));
+    }
 
     const operation = writeQueue.then(async () => {
       const allStats = await readAll();
       const current = allStats[plate];
       const updated: Omit<PublicPlateStats, 'plate'> = {
         lookupCount: (current?.lookupCount ?? 0) + 1,
+        status,
+        message,
         checkedAt,
-        previousCheckedAt: current?.checkedAt,
       };
       allStats[plate] = updated;
       await writeAll(allStats);
@@ -105,5 +128,5 @@ function getDefaultStore() {
 }
 
 export const getPlateStats = (plate: string) => getDefaultStore().get(plate);
-export const recordPlateLookup = (plate: string, checkedAt: string) =>
-  getDefaultStore().record(plate, checkedAt);
+export const recordPlateLookup = (plate: string, result: PlateLookupResult) =>
+  getDefaultStore().record(plate, result);

@@ -19,14 +19,14 @@ test('ships the self-hosted plate dashboard with browser-local persistence', asy
   assert.match(page, /window\.localStorage\.getItem/);
   assert.match(page, /window\.localStorage\.setItem/);
   assert.match(page, /AbortSignal\.timeout\(45_000\)/);
-  assert.match(page, /const CONCURRENCY = 1/);
+  assert.doesNotMatch(page, /checkMany/);
   assert.match(page, /useState<SavedPlate\[\]>\(\[\]\)/);
   assert.match(page, /Loading saved plate lookups/);
   assert.match(page, /aria-invalid/);
   assert.match(page, /aria-busy/);
   assert.match(
     page,
-    /Plate buckets stay in this browser\. Lookup counts and query dates are public\./,
+    /Plate buckets stay in this browser\. Lookup counts, query dates, and latest statuses/,
   );
 
   assert.match(layout, /Plate Pantry/);
@@ -85,8 +85,9 @@ test('keeps plate entry accessible and renders supplied artwork', async () => {
   assert.match(page, /stateSymbolCenterY = registrationCenterY/);
   assert.match(page, /actualBoundingBoxAscent/);
   assert.match(page, /Lookups/);
-  assert.match(page, /Queried on/);
-  assert.match(page, /Prev\. queried/);
+  assert.match(page, /Last queried/);
+  assert.doesNotMatch(page, /Prior query/);
+  assert.match(css, /\.lookup-stat-last-query/);
   assert.match(page, /Confirm removal of/);
   assert.match(page, /cancelOnPointerAway/);
   assert.match(page, /cancelOnEscape/);

@@ -8,14 +8,20 @@ test.beforeEach(async ({ page }) => {
   await page.route('**/api/stats?*', async (route) => {
     const plate = new URL(route.request().url()).searchParams.get('plate') ?? '';
     const isSavedFixture = plate === 'ABC@1234';
+    const isCachedFixture = plate === 'ABC 123';
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         plate,
-        lookupCount: isSavedFixture ? 7 : 0,
-        checkedAt: isSavedFixture ? '2026-08-02T12:00:00.000Z' : undefined,
-        previousCheckedAt: isSavedFixture ? '2026-08-01T12:00:00.000Z' : undefined,
+        lookupCount: isSavedFixture ? 7 : isCachedFixture ? 12 : 0,
+        status: isSavedFixture ? 'available' : isCachedFixture ? 'unavailable' : undefined,
+        message: isSavedFixture
+          ? 'Available when checked with NY DMV.'
+          : isCachedFixture
+            ? 'Not available according to NY DMV.'
+            : undefined,
+        checkedAt: isSavedFixture || isCachedFixture ? '2026-08-02T12:00:00.000Z' : undefined,
       }),
     });
   });
@@ -47,7 +53,9 @@ test('renders an accessible, responsive plate workspace', async ({ page }) => {
   await expect(input).toBeVisible();
   await expect(page.getByRole('button', { name: 'Search' })).toBeVisible();
   await expect(
-    page.getByText('Plate buckets stay in this browser. Lookup counts and query dates are public.'),
+    page.getByText(
+      'Plate buckets stay in this browser. Lookup counts, query dates, and latest statuses are public.',
+    ),
   ).toBeVisible();
 
   const registration = page.locator('.plate-registration-pixels').first();
@@ -185,10 +193,9 @@ test('loads saved plates without refreshing them against the DMV', async ({ page
   await page.goto(appPath());
   await expect(page.getByRole('img', { name: 'New York passenger plate ABC@1234' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('data-sample-flashed', 'false');
-  await expect(page.getByText('Not queried')).toBeVisible();
+  await expect(page.getByText('Available')).toBeVisible();
   await expect(page.locator('.lookup-stats dd').nth(0)).toHaveText('7');
   await expect(page.locator('.lookup-stats dd').nth(1)).toHaveText('08/02/2026');
-  await expect(page.locator('.lookup-stats dd').nth(2)).toHaveText('08/01/2026');
 
   const registration = page.locator('.plate-registration-pixels').first();
   await expect
@@ -233,21 +240,20 @@ test('loads saved plates without refreshing them against the DMV', async ({ page
   expect(apiCalls).toBe(0);
 });
 
-test('shows server-owned aggregate history when a plate is added to the local bucket', async ({
-  page,
-}) => {
+test('shows the saved status by default and refreshes only when asked', async ({ page }) => {
+  let apiCalls = 0;
   await page.route('**/api/check', async (route) => {
+    apiCalls += 1;
     expect(JSON.parse(route.request().postData() ?? '{}')).toEqual({ plate: 'ABC 123' });
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         plate: 'ABC 123',
-        status: 'unavailable',
-        message: 'Unavailable when checked with NY DMV.',
-        lookupCount: 12,
+        status: 'available',
+        message: 'Available when checked with NY DMV.',
+        lookupCount: 13,
         checkedAt: '2026-08-02T14:00:00.000Z',
-        previousCheckedAt: '2026-08-02T12:00:00.000Z',
       }),
     });
   });
@@ -258,9 +264,10 @@ test('shows server-owned aggregate history when a plate is added to the local bu
 
   await expect(page.getByRole('img', { name: 'New York passenger plate ABC 123' })).toBeVisible();
   await expect(page.getByText('Unavailable')).toBeVisible();
+  await expect(page.locator('.lookup-stat-last-query dt')).toHaveText('Last queried');
   await expect(page.locator('.lookup-stats dd').nth(0)).toHaveText('12');
   await expect(page.locator('.lookup-stats dd').nth(1)).toHaveText('08/02/2026');
-  await expect(page.locator('.lookup-stats dd').nth(2)).toHaveText('08/02/2026');
+  expect(apiCalls).toBe(0);
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -272,7 +279,42 @@ test('shows server-owned aggregate history when a plate is added to the local bu
         id: expect.any(String),
         value: 'ABC 123',
         status: 'unavailable',
-        message: 'Unavailable when checked with NY DMV.',
+        message: 'Not available according to NY DMV.',
       },
     ]);
+
+  await page.getByRole('button', { name: 'Refresh ABC 123 lookup' }).click();
+  await expect(page.getByText('Available')).toBeVisible();
+  await expect(page.locator('.lookup-stats dd').nth(0)).toHaveText('13');
+  expect(apiCalls).toBe(1);
+});
+
+test('checks the DMV automatically when a plate has no saved history', async ({ page }) => {
+  let apiCalls = 0;
+  await page.route('**/api/check', async (route) => {
+    apiCalls += 1;
+    expect(JSON.parse(route.request().postData() ?? '{}')).toEqual({ plate: 'NEW 123' });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        plate: 'NEW 123',
+        status: 'available',
+        message: 'Available when checked with NY DMV.',
+        lookupCount: 1,
+        checkedAt: '2026-08-03T14:00:00.000Z',
+      }),
+    });
+  });
+
+  await page.goto(appPath());
+  expect(apiCalls).toBe(0);
+  await page.getByPlaceholder('NYK IN 5').fill('new 123');
+  await page.getByRole('button', { name: 'Search' }).click();
+
+  await expect(page.getByRole('img', { name: 'New York passenger plate NEW 123' })).toBeVisible();
+  await expect(page.getByText('Available')).toBeVisible();
+  await expect(page.locator('.lookup-stats dd').nth(0)).toHaveText('1');
+  await expect(page.locator('.lookup-stats dd').nth(1)).toHaveText('08/03/2026');
+  expect(apiCalls).toBe(1);
 });
